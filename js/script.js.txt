@@ -1,170 +1,157 @@
 /* =====================================================
-   UI.JS – Bootstrap-like JS (Vanilla)
+   UI.JS
+   Lightweight Bootstrap-like JS + AJAX (Vanilla)
    ===================================================== */
 
-(function () {
+(() => {
   "use strict";
 
   /* ---------------------------------
-     Helpers
+     HELPER FUNCTIONS
   ---------------------------------- */
   const $ = (selector, scope = document) => scope.querySelector(selector);
   const $$ = (selector, scope = document) => [...scope.querySelectorAll(selector)];
 
-  function trigger(el, name) {
-    el.dispatchEvent(new CustomEvent(name, { bubbles: true }));
-  }
+  const on = (event, selector, handler) => {
+    document.addEventListener(event, e => {
+      if (e.target.closest(selector)) handler(e);
+    });
+  };
 
   /* ---------------------------------
      MODAL
+     data-ui-toggle="modal"
+     data-ui-target="#modalId"
   ---------------------------------- */
-  function initModals() {
-    $$("[data-ui-toggle='modal']").forEach(btn => {
-      const target = $(btn.dataset.uiTarget);
+  on("click", "[data-ui-toggle='modal']", e => {
+    const target = $(e.target.dataset.uiTarget);
+    if (!target) return;
+    target.classList.add("show");
+    document.body.classList.add("modal-open");
+  });
 
-      btn.addEventListener("click", () => {
-        target.classList.add("show");
-        target.setAttribute("aria-hidden", "false");
-        document.body.classList.add("modal-open");
-      });
-    });
-
-    $$("[data-ui-dismiss='modal']").forEach(btn => {
-      btn.addEventListener("click", () => {
-        const modal = btn.closest(".modal");
-        modal.classList.remove("show");
-        modal.setAttribute("aria-hidden", "true");
-        document.body.classList.remove("modal-open");
-      });
-    });
-  }
+  on("click", "[data-ui-dismiss='modal']", e => {
+    const modal = e.target.closest(".modal");
+    if (!modal) return;
+    modal.classList.remove("show");
+    document.body.classList.remove("modal-open");
+  });
 
   /* ---------------------------------
      DROPDOWN
+     data-ui-toggle="dropdown"
   ---------------------------------- */
-  function initDropdowns() {
-    $$("[data-ui-toggle='dropdown']").forEach(toggle => {
-      const menu = toggle.nextElementSibling;
+  on("click", "[data-ui-toggle='dropdown']", e => {
+    e.preventDefault();
+    const menu = e.target.nextElementSibling;
+    if (menu) menu.classList.toggle("show");
+  });
 
-      toggle.addEventListener("click", e => {
-        e.stopPropagation();
-        menu.classList.toggle("show");
-      });
+  document.addEventListener("click", e => {
+    $$(".dropdown-menu.show").forEach(menu => {
+      if (!menu.parentElement.contains(e.target)) {
+        menu.classList.remove("show");
+      }
     });
-
-    document.addEventListener("click", () => {
-      $$(".dropdown-menu.show").forEach(menu =>
-        menu.classList.remove("show")
-      );
-    });
-  }
+  });
 
   /* ---------------------------------
      COLLAPSE
+     data-ui-toggle="collapse"
+     data-ui-target="#id"
   ---------------------------------- */
-  function initCollapse() {
-    $$("[data-ui-toggle='collapse']").forEach(btn => {
-      const target = $(btn.dataset.uiTarget);
-
-      btn.addEventListener("click", () => {
-        const isOpen = target.classList.toggle("show");
-        btn.setAttribute("aria-expanded", isOpen);
-      });
-    });
-  }
+  on("click", "[data-ui-toggle='collapse']", e => {
+    const target = $(e.target.dataset.uiTarget);
+    if (target) target.classList.toggle("show");
+  });
 
   /* ---------------------------------
      TABS
+     data-ui-toggle="tab"
   ---------------------------------- */
-  function initTabs() {
-    $$("[data-ui-toggle='tab']").forEach(tab => {
-      tab.addEventListener("click", e => {
-        e.preventDefault();
+  on("click", "[data-ui-toggle='tab']", e => {
+    e.preventDefault();
+    const target = $(e.target.dataset.uiTarget);
+    if (!target) return;
 
-        const parent = tab.closest(".tabs");
-        const target = $(tab.dataset.uiTarget);
+    const parent = e.target.closest(".tab-group");
+    if (!parent) return;
 
-        $$("[data-ui-toggle='tab']", parent)
-          .forEach(t => t.classList.remove("active"));
-        $$(".tab-pane", parent)
-          .forEach(p => p.classList.remove("active"));
+    $$(".tab-pane", parent).forEach(p => p.classList.remove("show", "active"));
+    $$(".tab-link", parent).forEach(t => t.classList.remove("active"));
 
-        tab.classList.add("active");
-        target.classList.add("active");
-      });
-    });
-  }
+    e.target.classList.add("active");
+    target.classList.add("show", "active");
+  });
 
   /* ---------------------------------
-     ALERT
+     ALERT DISMISS
+     data-ui-dismiss="alert"
   ---------------------------------- */
-  function initAlerts() {
-    $$("[data-ui-dismiss='alert']").forEach(btn => {
-      btn.addEventListener("click", () => {
-        const alert = btn.closest(".alert");
-        alert.classList.add("fade");
-        setTimeout(() => alert.remove(), 300);
-      });
-    });
-  }
+  on("click", "[data-ui-dismiss='alert']", e => {
+    const alert = e.target.closest(".alert");
+    if (alert) alert.remove();
+  });
 
   /* ---------------------------------
-     TOOLTIP (basic)
+     TOAST
+     data-ui-toast="#toastId"
   ---------------------------------- */
-  function initTooltips() {
-    $$("[data-ui-tooltip]").forEach(el => {
-      let tip;
+  window.showToast = (selector, timeout = 3000) => {
+    const toast = $(selector);
+    if (!toast) return;
 
-      el.addEventListener("mouseenter", () => {
-        tip = document.createElement("div");
-        tip.className = "tooltip";
-        tip.textContent = el.dataset.uiTooltip;
-        document.body.appendChild(tip);
+    toast.classList.add("show");
+    setTimeout(() => toast.classList.remove("show"), timeout);
+  };
 
-        const rect = el.getBoundingClientRect();
-        tip.style.left = rect.left + window.scrollX + "px";
-        tip.style.top = rect.top + window.scrollY - tip.offsetHeight - 8 + "px";
-      });
-
-      el.addEventListener("mouseleave", () => {
-        if (tip) tip.remove();
-      });
-    });
-  }
+  /* =====================================================
+     AJAX (NO PAGE RELOAD PHP REQUESTS)
+     ===================================================== */
 
   /* ---------------------------------
-     OFFCANVAS
+     AJAX GET
   ---------------------------------- */
-  function initOffcanvas() {
-    $$("[data-ui-toggle='offcanvas']").forEach(btn => {
-      const target = $(btn.dataset.uiTarget);
-
-      btn.addEventListener("click", () => {
-        target.classList.add("show");
-        document.body.classList.add("offcanvas-open");
-      });
+  window.ajaxGet = async (url) => {
+    const res = await fetch(url, {
+      headers: { "X-Requested-With": "XMLHttpRequest" }
     });
-
-    $$("[data-ui-dismiss='offcanvas']").forEach(btn => {
-      btn.addEventListener("click", () => {
-        const panel = btn.closest(".offcanvas");
-        panel.classList.remove("show");
-        document.body.classList.remove("offcanvas-open");
-      });
-    });
-  }
+    return res.text();
+  };
 
   /* ---------------------------------
-     INIT ALL
+     AJAX POST
   ---------------------------------- */
-  document.addEventListener("DOMContentLoaded", () => {
-    initModals();
-    initDropdowns();
-    initCollapse();
-    initTabs();
-    initAlerts();
-    initTooltips();
-    initOffcanvas();
+  window.ajaxPost = async (url, data) => {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "X-Requested-With": "XMLHttpRequest" },
+      body: data
+    });
+    return res.text();
+  };
+
+  /* ---------------------------------
+     AJAX FORM SUBMIT
+     data-ui-ajax="true"
+  ---------------------------------- */
+  on("submit", "form[data-ui-ajax='true']", async e => {
+    e.preventDefault();
+
+    const form = e.target;
+    const method = form.method.toUpperCase() || "POST";
+    const action = form.action;
+    const formData = new FormData(form);
+
+    let response;
+    if (method === "GET") {
+      response = await ajaxGet(action + "?" + new URLSearchParams(formData));
+    } else {
+      response = await ajaxPost(action, formData);
+    }
+
+    const target = form.dataset.uiTarget;
+    if (target) $(target).innerHTML = response;
   });
 
 })();
