@@ -1,68 +1,112 @@
 <?php
 require_once "../database/db_connection.php";
 
-header('Content-Type: application/json');
+/* =========================
+   ACTION HANDLER
+========================= */
+$action = $_POST['action'] ?? null;
 
-$action = $_POST['action'] ?? '';
-$id = $_POST['id'] ?? '';
-$book_title = $_POST['book_title'] ?? '';
-$author = $_POST['author'] ?? '';
-$description = $_POST['description'] ?? '';
-$copyrightyear = $_POST['copyrightyear'] ?? '';
-$subject = $_POST['subject'] ?? '';
-$type = $_POST['type'] ?? '';
+/* ---------- SAVE BOOK ---------- */
+if ($action === "save") {
+  $id = $_POST['id'] ?? null;
 
-$response = ['success' => false, 'message' => ''];
+  if ($id) {
+    $stmt = $conn->prepare(
+      "UPDATE books SET book_title=?, author=?, description=?, copyrightyear=?, subject=?, type=? WHERE id=?"
+    );
+    $stmt->bind_param(
+      "sssissi",
+      $_POST['book_title'],
+      $_POST['author'],
+      $_POST['description'],
+      $_POST['copyrightyear'],
+      $_POST['subject'],
+      $_POST['type'],
+      $id
+    );
+  } else {
+    $stmt = $conn->prepare(
+      "INSERT INTO books (book_title, author, description, copyrightyear, subject, type)
+       VALUES (?,?,?,?,?,?)"
+    );
+    $stmt->bind_param(
+      "sssiss",
+      $_POST['book_title'],
+      $_POST['author'],
+      $_POST['description'],
+      $_POST['copyrightyear'],
+      $_POST['subject'],
+      $_POST['type']
+    );
+  }
 
-switch($action){
-    case 'add':
-        $stmt = $conn->prepare("INSERT INTO books (book_title, author, description, copyrightyear, subject, type, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())");
-        $stmt->bind_param("sssiss", $book_title, $author, $description, $copyrightyear, $subject, $type);
-        $response['success'] = $stmt->execute();
-        $response['message'] = $response['success'] ? 'Book added successfully' : $stmt->error;
-        break;
-
-    case 'edit':
-        $stmt = $conn->prepare("UPDATE books SET book_title=?, author=?, description=?, copyrightyear=?, subject=?, type=?, updated_at=NOW() WHERE id=?");
-        $stmt->bind_param("sssissi", $book_title, $author, $description, $copyrightyear, $subject, $type, $id);
-        $response['success'] = $stmt->execute();
-        $response['message'] = $response['success'] ? 'Book updated successfully' : $stmt->error;
-        break;
-
-    case 'delete':
-        $stmt = $conn->prepare("DELETE FROM books WHERE id=?");
-        $stmt->bind_param("i", $id);
-        $response['success'] = $stmt->execute();
-        $response['message'] = $response['success'] ? 'Book deleted successfully' : $stmt->error;
-        break;
+  $stmt->execute();
 }
 
-if($response['success']){
-    // Return updated table rows for AJAX refresh
-    $books = $conn->query("
-        SELECT b.id, b.book_title, b.author, b.description, b.copyrightyear, s.subject, bt.type
-        FROM books b
-        LEFT JOIN subject s ON b.subject = s.subject
-        LEFT JOIN book_types bt ON b.type = bt.type
-        ORDER BY b.book_title ASC
-    ")->fetch_all(MYSQLI_ASSOC);
-
-    ob_start();
-    foreach($books as $book){
-        echo '<tr data-id="'.$book['id'].'">
-                <td>'.htmlspecialchars($book['book_title']).'</td>
-                <td>'.htmlspecialchars($book['author']).'</td>
-                <td>'.htmlspecialchars($book['description']).'</td>
-                <td>'.htmlspecialchars($book['copyrightyear']).'</td>
-                <td>'.htmlspecialchars($book['subject']).'</td>
-                <td>'.htmlspecialchars($book['type']).'</td>
-                <td>
-                    <button class="editBookBtn" data-ui-toggle="modal" data-ui-target="#editBookModal" data-id="'.$book['id'].'">Edit</button>
-                    <button class="deleteBookBtn" data-ui-toggle="modal" data-ui-target="#deleteBookModal" data-id="'.$book['id'].'">Delete</button>
-                </td>
-              </tr>';
-    }
-    $response['html'] = ob_get_clean();
+/* ---------- DELETE BOOK ---------- */
+if ($action === "delete") {
+  $stmt = $conn->prepare("DELETE FROM books WHERE id=?");
+  $stmt->bind_param("i", $_POST['id']);
+  $stmt->execute();
 }
 
-echo json_encode($response);
+/* ---------- SUBJECT CRUD ---------- */
+if ($action === "add_subject") {
+  $stmt = $conn->prepare("INSERT INTO subject (subject) VALUES (?)");
+  $stmt->bind_param("s", $_POST['subject']);
+  $stmt->execute();
+}
+
+if ($action === "delete_subject") {
+  $stmt = $conn->prepare("DELETE FROM subject WHERE id=?");
+  $stmt->bind_param("i", $_POST['id']);
+  $stmt->execute();
+}
+
+/* ---------- TYPE CRUD ---------- */
+if ($action === "add_type") {
+  $stmt = $conn->prepare("INSERT INTO book_types (type) VALUES (?)");
+  $stmt->bind_param("s", $_POST['type']);
+  $stmt->execute();
+}
+
+if ($action === "delete_type") {
+  $stmt = $conn->prepare("DELETE FROM book_types WHERE id=?");
+  $stmt->bind_param("i", $_POST['id']);
+  $stmt->execute();
+}
+
+/* =========================
+   BOOKS TABLE OUTPUT
+========================= */
+$result = $conn->query("SELECT * FROM books ORDER BY created_at DESC");
+?>
+
+<table>
+  <thead>
+    <tr>
+      <th>Title</th>
+      <th>Author</th>
+      <th>Subject</th>
+      <th>Type</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+  <?php while ($b = $result->fetch_assoc()): ?>
+    <tr>
+      <td><?= htmlspecialchars($b['book_title']) ?></td>
+      <td><?= htmlspecialchars($b['author']) ?></td>
+      <td><?= htmlspecialchars($b['subject']) ?></td>
+      <td><?= htmlspecialchars($b['type']) ?></td>
+      <td>
+        <form method="POST" action="books_script.php" data-ui-ajax="true" data-ui-target="#booksTable" style="display:inline">
+          <input type="hidden" name="action" value="delete">
+          <input type="hidden" name="id" value="<?= $b['id'] ?>">
+          <button type="submit">Delete</button>
+        </form>
+      </td>
+    </tr>
+  <?php endwhile; ?>
+  </tbody>
+</table>
