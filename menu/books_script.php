@@ -1,112 +1,95 @@
 <?php
-require_once "../database/db_connection.php";
+include "../database/db_connection.php";
 
-/* =========================
-   ACTION HANDLER
-========================= */
-$action = $_POST['action'] ?? null;
+// Handle AJAX requests
+$action = $_REQUEST['action'] ?? '';
 
-/* ---------- SAVE BOOK ---------- */
-if ($action === "save") {
-  $id = $_POST['id'] ?? null;
+if($action == 'add'){
+    $book_title = $_POST['book_title'];
+    $author = $_POST['author'];
+    $description = $_POST['description'];
+    $copyrightyear = $_POST['copyrightyear'];
+    $subject = $_POST['subject'];
+    $type = $_POST['type'];
 
-  if ($id) {
-    $stmt = $conn->prepare(
-      "UPDATE books SET book_title=?, author=?, description=?, copyrightyear=?, subject=?, type=? WHERE id=?"
-    );
-    $stmt->bind_param(
-      "sssissi",
-      $_POST['book_title'],
-      $_POST['author'],
-      $_POST['description'],
-      $_POST['copyrightyear'],
-      $_POST['subject'],
-      $_POST['type'],
-      $id
-    );
-  } else {
-    $stmt = $conn->prepare(
-      "INSERT INTO books (book_title, author, description, copyrightyear, subject, type)
-       VALUES (?,?,?,?,?,?)"
-    );
-    $stmt->bind_param(
-      "sssiss",
-      $_POST['book_title'],
-      $_POST['author'],
-      $_POST['description'],
-      $_POST['copyrightyear'],
-      $_POST['subject'],
-      $_POST['type']
-    );
-  }
+    $stmt = $conn->prepare("INSERT INTO books (book_title, author, description, copyrightyear, subject, type, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())");
+    $stmt->bind_param("sssiss", $book_title, $author, $description, $copyrightyear, $subject, $type);
+    $stmt->execute();
+    $stmt->close();
 
-  $stmt->execute();
+    echo listBooks();
+    exit;
 }
 
-/* ---------- DELETE BOOK ---------- */
-if ($action === "delete") {
-  $stmt = $conn->prepare("DELETE FROM books WHERE id=?");
-  $stmt->bind_param("i", $_POST['id']);
-  $stmt->execute();
+if($action == 'edit'){
+    $id = $_POST['id'];
+    $book_title = $_POST['book_title'];
+    $author = $_POST['author'];
+    $description = $_POST['description'];
+    $copyrightyear = $_POST['copyrightyear'];
+    $subject = $_POST['subject'];
+    $type = $_POST['type'];
+
+    $stmt = $conn->prepare("UPDATE books SET book_title=?, author=?, description=?, copyrightyear=?, subject=?, type=?, updated_at=NOW() WHERE id=?");
+    $stmt->bind_param("sssissi", $book_title, $author, $description, $copyrightyear, $subject, $type, $id);
+    $stmt->execute();
+    $stmt->close();
+
+    echo listBooks();
+    exit;
 }
 
-/* ---------- SUBJECT CRUD ---------- */
-if ($action === "add_subject") {
-  $stmt = $conn->prepare("INSERT INTO subject (subject) VALUES (?)");
-  $stmt->bind_param("s", $_POST['subject']);
-  $stmt->execute();
+if($action == 'delete'){
+    $id = $_POST['id'];
+    $stmt = $conn->prepare("DELETE FROM books WHERE id=?");
+    $stmt->bind_param("i", $id);
+    $stmt->execute();
+    $stmt->close();
+
+    echo listBooks();
+    exit;
 }
 
-if ($action === "delete_subject") {
-  $stmt = $conn->prepare("DELETE FROM subject WHERE id=?");
-  $stmt->bind_param("i", $_POST['id']);
-  $stmt->execute();
+if($action == 'list'){
+    echo listBooks();
+    exit;
 }
 
-/* ---------- TYPE CRUD ---------- */
-if ($action === "add_type") {
-  $stmt = $conn->prepare("INSERT INTO book_types (type) VALUES (?)");
-  $stmt->bind_param("s", $_POST['type']);
-  $stmt->execute();
+// ==========================
+// Function to return books table HTML
+// ==========================
+function listBooks(){
+    global $conn;
+    $result = $conn->query("SELECT * FROM books ORDER BY created_at DESC");
+    $html = '<table>
+                <thead>
+                    <tr>
+                        <th>Title</th>
+                        <th>Author</th>
+                        <th>Description</th>
+                        <th>Year</th>
+                        <th>Subject</th>
+                        <th>Type</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>';
+    while($row = $result->fetch_assoc()){
+        $json = htmlspecialchars(json_encode($row));
+        $html .= '<tr>
+                    <td>'.htmlspecialchars($row['book_title']).'</td>
+                    <td>'.htmlspecialchars($row['author']).'</td>
+                    <td>'.htmlspecialchars($row['description']).'</td>
+                    <td>'.htmlspecialchars($row['copyrightyear']).'</td>
+                    <td>'.htmlspecialchars($row['subject']).'</td>
+                    <td>'.htmlspecialchars($row['type']).'</td>
+                    <td>
+                        <button onclick="editBook(`'.$json.'`)">Edit</button>
+                        <button onclick="deleteBook('.$row['id'].')">Delete</button>
+                    </td>
+                  </tr>';
+    }
+    $html .= '</tbody></table>';
+    return $html;
 }
-
-if ($action === "delete_type") {
-  $stmt = $conn->prepare("DELETE FROM book_types WHERE id=?");
-  $stmt->bind_param("i", $_POST['id']);
-  $stmt->execute();
-}
-
-/* =========================
-   BOOKS TABLE OUTPUT
-========================= */
-$result = $conn->query("SELECT * FROM books ORDER BY created_at DESC");
 ?>
-
-<table>
-  <thead>
-    <tr>
-      <th>Title</th>
-      <th>Author</th>
-      <th>Subject</th>
-      <th>Type</th>
-      <th>Actions</th>
-    </tr>
-  </thead>
-  <tbody>
-  <?php while ($b = $result->fetch_assoc()): ?>
-    <tr>
-      <td><?= htmlspecialchars($b['book_title']) ?></td>
-      <td><?= htmlspecialchars($b['author']) ?></td>
-      <td><?= htmlspecialchars($b['subject']) ?></td>
-      <td><?= htmlspecialchars($b['type']) ?></td>
-      <td>
-        <form method="POST" action="books_script.php" data-ui-ajax="true" data-ui-target="#booksTable" style="display:inline">
-          <input type="hidden" name="action" value="delete">
-          <input type="hidden" name="id" value="<?= $b['id'] ?>">
-          <button type="submit">Delete</button>
-        </form>
-      </td>
-    </tr>
-  <?php endwhile; ?>
-  </tbody>
-</table>
