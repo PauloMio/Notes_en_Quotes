@@ -1,214 +1,118 @@
 <?php
 require_once "../database/db_connection.php";
 
-$subjects = $conn->query("SELECT * FROM subject ORDER BY subject ASC");
-$types    = $conn->query("SELECT * FROM book_types ORDER BY type ASC");
+// Fetch subjects for dropdown
+$subject_result = $conn->query("SELECT * FROM subject ORDER BY subject ASC");
+$subjects = $subject_result->fetch_all(MYSQLI_ASSOC);
+
+// Fetch book types for dropdown
+$type_result = $conn->query("SELECT * FROM book_types ORDER BY type ASC");
+$types = $type_result->fetch_all(MYSQLI_ASSOC);
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Books Setup</title>
-<link rel="stylesheet" href="../css/style.css">
+    <meta charset="UTF-8">
+    <title>Books Setup</title>
+    <link rel="stylesheet" href="../css/style.css">
 </head>
 <body>
-
 <div class="container mt-4">
-  <div class="block">
+    <h2>Books Setup</h2>
+    <button data-ui-toggle="modal" data-ui-target="#addBookModal">Add New Book</button>
 
-    <h2>Books</h2>
-
-    <div class="mb-3">
-      <button data-ui-toggle="modal" data-ui-target="#bookModal">
-        + Add Book
-      </button>
+    <!-- Books Table -->
+    <div id="booksTable" class="mt-3">
+        <?php include "books_table.php"; ?>
     </div>
-
-    <div id="booksTable">
-      <?php include "books_script.php"; ?>
-    </div>
-
-  </div>
 </div>
 
-<!-- =========================
-     BOOK MODAL
-========================= -->
-<div class="modal" id="bookModal">
-  <div class="modal-content container">
-    <div class="block">
+<!-- ======================
+     ADD BOOK MODAL
+====================== -->
+<div id="addBookModal" class="modal">
+    <div class="modal-content block">
+        <h3>Add Book</h3>
+        <form id="addBookForm" action="books_script.php" method="POST" data-ui-ajax="true" data-ui-target="#booksTable">
+            <input type="hidden" name="action" value="add">
 
-      <h3 class="mb-3">Add / Edit Book</h3>
-
-      <form method="POST"
-            action="books_script.php"
-            data-ui-ajax="true"
-            data-ui-target="#booksTable">
-
-        <input type="hidden" name="action" value="save">
-        <input type="hidden" name="id" id="book_id">
-
-        <!-- BOOK TITLE -->
-        <div class="form-group">
-          <label>Book Title</label>
-          <input type="text" name="book_title" required>
-        </div>
-
-        <!-- AUTHOR -->
-        <div class="form-group">
-          <label>Author</label>
-          <input type="text" name="author">
-        </div>
-
-        <!-- DESCRIPTION -->
-        <div class="form-group">
-          <label>Description</label>
-          <textarea name="description"></textarea>
-        </div>
-
-        <!-- COPYRIGHT YEAR -->
-        <div class="form-group">
-          <label>Copyright Year</label>
-          <input type="number" name="copyrightyear">
-        </div>
-
-        <!-- SUBJECT DROPDOWN -->
-        <div class="form-group">
-          <label>Subject</label>
-
-          <div class="dropdown">
-            <button type="button" data-ui-toggle="dropdown">
-              Select Subject
-            </button>
-
-            <div class="dropdown-menu block">
-              <?php while ($s = $subjects->fetch_assoc()): ?>
-                <div class="row mb-1">
-                  <div class="col">
-                    <span style="cursor:pointer"
-                          onclick="selectSubject('<?= htmlspecialchars($s['subject']) ?>')">
-                      <?= htmlspecialchars($s['subject']) ?>
-                    </span>
-                  </div>
-                  <div>
-                    <button type="button"
-                            onclick="deleteSubject(<?= $s['id'] ?>)">
-                      ✕
-                    </button>
-                  </div>
-                </div>
-              <?php endwhile; ?>
-
-              <div class="form-group mt-2">
-                <input type="text" id="newSubject" placeholder="New subject">
-              </div>
-
-              <button type="button" onclick="addSubject()">Add</button>
+            <div class="form-group">
+                <label>Book Title</label>
+                <input type="text" name="book_title" required>
             </div>
-          </div>
-
-          <input type="hidden" name="subject" id="subject_input">
-        </div>
-
-        <!-- TYPE DROPDOWN -->
-        <div class="form-group">
-          <label>Book Type</label>
-
-          <div class="dropdown">
-            <button type="button" data-ui-toggle="dropdown">
-              Select Type
-            </button>
-
-            <div class="dropdown-menu block">
-              <?php while ($t = $types->fetch_assoc()): ?>
-                <div class="row mb-1">
-                  <div class="col">
-                    <span style="cursor:pointer"
-                          onclick="selectType('<?= htmlspecialchars($t['type']) ?>')">
-                      <?= htmlspecialchars($t['type']) ?>
-                    </span>
-                  </div>
-                  <div>
-                    <button type="button"
-                            onclick="deleteType(<?= $t['id'] ?>)">
-                      ✕
-                    </button>
-                  </div>
-                </div>
-              <?php endwhile; ?>
-
-              <div class="form-group mt-2">
-                <input type="text" id="newType" placeholder="New type">
-              </div>
-
-              <button type="button" onclick="addType()">Add</button>
+            <div class="form-group">
+                <label>Author</label>
+                <input type="text" name="author">
             </div>
-          </div>
+            <div class="form-group">
+                <label>Description</label>
+                <textarea name="description"></textarea>
+            </div>
+            <div class="form-group">
+                <label>Copyright Year</label>
+                <input type="number" name="copyrightyear">
+            </div>
+            <div class="form-group">
+                <label>Subject</label>
+                <select name="subject" required>
+                    <option value="">--Select Subject--</option>
+                    <?php foreach($subjects as $sub): ?>
+                        <option value="<?= htmlspecialchars($sub['subject']) ?>"><?= htmlspecialchars($sub['subject']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Type</label>
+                <select name="type" required>
+                    <option value="">--Select Type--</option>
+                    <?php foreach($types as $type): ?>
+                        <option value="<?= htmlspecialchars($type['type']) ?>"><?= htmlspecialchars($type['type']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
 
-          <input type="hidden" name="type" id="type_input">
-        </div>
-
-        <!-- ACTION BUTTONS -->
-        <div class="row mt-4">
-          <div>
-            <button type="submit">Save</button>
-          </div>
-          <div>
-            <button type="button" data-ui-dismiss="modal">
-              Cancel
-            </button>
-          </div>
-        </div>
-
-      </form>
-
+            <button type="submit">Add Book</button>
+            <button type="button" data-ui-dismiss="modal">Cancel</button>
+        </form>
     </div>
-  </div>
+</div>
+
+<!-- ======================
+     EDIT BOOK MODAL (Dynamic)
+====================== -->
+<div id="editBookModal" class="modal">
+    <div class="modal-content block" id="editBookContent">
+        <!-- AJAX will load edit form here -->
+    </div>
+</div>
+
+<!-- ======================
+     DELETE CONFIRM MODAL
+====================== -->
+<div id="deleteBookModal" class="modal">
+    <div class="modal-content block" id="deleteBookContent">
+        <!-- AJAX will load delete confirmation here -->
+    </div>
 </div>
 
 <script src="../js/script.js"></script>
-
 <script>
-function selectSubject(value) {
-  document.getElementById("subject_input").value = value;
-}
+    // Open Edit Modal
+    async function editBook(id) {
+        const html = await ajaxGet('books_script.php?action=editForm&id=' + id);
+        document.getElementById('editBookContent').innerHTML = html;
+        document.getElementById('editBookModal').classList.add('show');
+        document.body.classList.add('modal-open');
+    }
 
-function selectType(value) {
-  document.getElementById("type_input").value = value;
-}
-
-async function addSubject() {
-  const fd = new FormData();
-  fd.append("action", "add_subject");
-  fd.append("subject", document.getElementById("newSubject").value);
-  await ajaxPost("books_script.php", fd);
-  location.reload();
-}
-
-async function deleteSubject(id) {
-  const fd = new FormData();
-  fd.append("action", "delete_subject");
-  fd.append("id", id);
-  await ajaxPost("books_script.php", fd);
-  location.reload();
-}
-
-async function addType() {
-  const fd = new FormData();
-  fd.append("action", "add_type");
-  fd.append("type", document.getElementById("newType").value);
-  await ajaxPost("books_script.php", fd);
-  location.reload();
-}
-
-async function deleteType(id) {
-  const fd = new FormData();
-  fd.append("action", "delete_type");
-  fd.append("id", id);
-  await ajaxPost("books_script.php", fd);
-  location.reload();
-}
+    // Open Delete Modal
+    async function deleteBook(id) {
+        const html = await ajaxGet('books_script.php?action=deleteForm&id=' + id);
+        document.getElementById('deleteBookContent').innerHTML = html;
+        document.getElementById('deleteBookModal').classList.add('show');
+        document.body.classList.add('modal-open');
+    }
 </script>
-
 </body>
 </html>
